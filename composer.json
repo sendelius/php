@@ -1,5 +1,8 @@
 {
   "name": "sendelius/php",
+  "description": "PHP-фреймворк и инфраструктурные библиотеки",
+  "type": "library",
+  "license": "MIT",
   "authors": [
     {
       "name": "Sendelius",
