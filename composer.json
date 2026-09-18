@@ -1,0 +1,23 @@
+{
+  "name": "sendelius/php",
+  "authors": [
+    {
+      "name": "Sendelius",
+      "email": "root@sendelius.ru",
+      "homepage": "https://sendelius.ru"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Sendelius\\": "./src"
+    }
+  },
+  "minimum-stability": "dev",
+  "require": {
+    "php": ">=8.3",
+    "ext-pdo": "*",
+    "ext-redis": "*",
+    "ext-json": "*",
+    "vlucas/phpdotenv": "5.6.*"
+  }
+}
