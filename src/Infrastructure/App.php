@@ -26,6 +26,12 @@ class App {
 		define('DS', DIRECTORY_SEPARATOR);
 		define('APP_DIR', dirname($reflection->getFileName(), 2) . DS);
 
+		$dotenv = Dotenv::createImmutable(APP_DIR);
+		$dotenv->load();
+
+		define('DEV_MODE', Env::bool('DEV_MODE'));
+		Logger::init();
+
 		$this->response = new Response();
 
 		set_exception_handler(function (Throwable $exception): void {
@@ -38,12 +44,6 @@ class App {
 			$this->response->error((DEV_MODE) ? $exception->getMessage() : 'ошибка на сервере');
 		});
 		register_shutdown_function([$this, 'render']);
-
-		$dotenv = Dotenv::createImmutable(APP_DIR);
-		$dotenv->load();
-
-		define('DEV_MODE', Env::bool('DEV_MODE'));
-		Logger::init();
 
 		$this->router = new Router(
 			response: $this->response,

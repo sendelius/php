@@ -21,6 +21,7 @@
     "ext-pdo": "*",
     "ext-redis": "*",
     "ext-json": "*",
-    "vlucas/phpdotenv": "5.6.*"
+    "vlucas/phpdotenv": "5.7.*",
+    "ramsey/uuid": "4.9.*"
   }
 }

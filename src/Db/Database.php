@@ -6,6 +6,7 @@ use PDO;
 use PDOException;
 use RuntimeException;
 use Sendelius\Config\Env;
+use Throwable;
 
 class Database {
 	private static PDO $pdo;
@@ -15,9 +16,11 @@ class Database {
 	private array $pieces = [
 		'where' => [],
 		'limit' => null,
+		'order' => null,
 		'keys' => [],
 		'data' => [],
 		'selectColumns' => [],
+		'pagination' => false,
 	];
 
 	public function __construct() {
@@ -47,10 +50,46 @@ class Database {
 		return $this;
 	}
 
+	public function pagination(int $page = 1, int $limit = 100): self {
+		$page = max(1, $page);
+		$limit = min(max(1, $limit), 1000);
+		$this->pieces['pagination'] = ['page' => $page, 'limit' => $limit];
+		return $this;
+	}
+
 	public function list(array $columns = []): array {
 		$this->pieces['selectColumns'] = $columns;
-		$result = $this->buildQuery('select', 'all');
-		return ($result && is_array($result)) ? array_map([$this, 'prepareResult'], $result) : [];
+		$pagination = $this->pieces['pagination'];
+		$total = 0;
+		$paginationData = null;
+		if ($pagination) {
+			$pieces = $this->pieces;
+			$total = $this->count();
+			$this->pieces = $pieces;
+			$page = $pagination['page'];
+			$limit = $pagination['limit'];
+			$last = $total > 0 ? (int)ceil($total / $limit) : 0;
+			if ($last > 0 && $page > $last) {
+				$page = $last;
+			}
+			$this->limit($limit, ($page - 1) * $limit);
+			$paginationData = [
+				'page' => $page,
+				'limit' => $limit,
+				'last' => $last,
+			];
+			if ($page < $last) {
+				$paginationData['next'] = $page + 1;
+			}
+			if ($page > 1) {
+				$paginationData['prev'] = $page - 1;
+			}
+		}
+		$items = $this->buildQuery('select', 'all') ?: [];
+		if (!$pagination) {
+			return $items;
+		}
+		return ['items' => $items, 'total' => $total, 'pagination' => $paginationData];
 	}
 
 	public function get(array $columns = []) {
@@ -64,7 +103,6 @@ class Database {
 			return 0;
 		}
 
-		$this->clearPieces();
 		$this->data($data, 'insert');
 		$result = $this->buildQuery('insert');
 		if ($result) {
@@ -85,6 +123,84 @@ class Database {
 		return (bool)$this->buildQuery('delete');
 	}
 
+	public function count(): int {
+		$result = $this->buildQuery('count', 'one');
+		return (int)($result['count'] ?? 0);
+	}
+
+	public function custom(string $sql, array $data = [], string $fetch = 'none'): mixed {
+		return $this->query($sql, $data, $fetch);
+	}
+
+	public function multiInsert(array $rows, int $chunkSize = 1000): int {
+		if (empty($rows)) {
+			return 0;
+		}
+		if ($chunkSize < 1) {
+			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
+		}
+		$total = 0;
+		foreach (array_chunk($rows, $chunkSize) as $chunk) {
+			$columns = array_keys($chunk[0]);
+			$values = [];
+			$data = [];
+			foreach ($chunk as $index => $row) {
+				if (array_keys($row) !== $columns) {
+					throw new RuntimeException('ошибка базы данных: структура строк для multiInsert должна быть одинаковой');
+				}
+				$placeholders = [];
+				foreach ($columns as $column) {
+					$key = ':insert_' . $index . '_' . $column;
+					$placeholders[] = $key;
+					$data[$key] = $row[$column];
+				}
+				$values[] = '(' . implode(',', $placeholders) . ')';
+			}
+			$sql = sprintf(
+				'INSERT INTO %s (%s) VALUES %s',
+				$this->tableName,
+				implode(',', $columns),
+				implode(',', $values)
+			);
+			if ($this->query($sql, $data)) {
+				$total += count($chunk);
+			}
+		}
+		return $total;
+	}
+
+	public function multiUpdate(array $rows, int $chunkSize = 1000): int {
+		if (empty($rows)) {
+			return 0;
+		}
+		if ($chunkSize < 1) {
+			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
+		}
+		$total = 0;
+		foreach (array_chunk($rows, $chunkSize) as $chunk) {
+			$total += $this->transaction(function () use ($chunk) {
+				$count = 0;
+				foreach ($chunk as $row) {
+					if (empty($row)) {
+						continue;
+					}
+					$key = array_key_first($row);
+					$value = $row[$key];
+					$data = $row;
+					unset($data[$key]);
+					if (empty($data)) {
+						continue;
+					}
+					if ($this->where([$key => $value])->update($data)) {
+						$count++;
+					}
+				}
+				return $count;
+			});
+		}
+		return $total;
+	}
+
 	public function where(array $conditions): self {
 		foreach ($conditions as $field => $condition) {
 			$this->data([$field => $condition], 'where');
@@ -98,6 +214,67 @@ class Database {
 		if ($offset > 0) $this->pieces['limit'] = "LIMIT " . $offset . "," . $rows;
 		else $this->pieces['limit'] = "LIMIT " . $rows;
 		return $this;
+	}
+
+	public function filter(array $filters, array $fields = []): self {
+		foreach ($filters as $field => $value) {
+			if (!empty($fields) && !in_array($field, $fields, true)) {
+				continue;
+			}
+			$this->where([$field => $value]);
+		}
+		return $this;
+	}
+
+	public function sort(string $field, string $type = 'asc', array $allowFields = []): self {
+		if (!empty($allowFields) && !in_array($field, $allowFields, true)) {
+			return $this;
+		}
+		$type = strtolower($type) === 'desc' ? 'DESC' : 'ASC';
+		$this->pieces['order'] = "$field $type";
+		return $this;
+	}
+
+	public function search(string $value, string $field = '', array $allowFields = []): self {
+		if ($value === '') {
+			return $this;
+		}
+		if (empty($allowFields)) {
+			$allowFields = ['title'];
+		}
+		if ($field !== '') {
+			$requested = array_map('trim', explode(',', $field));
+			$fields = array_values(array_intersect($requested, $allowFields));
+		} else {
+			$fields = array_slice($allowFields, 0, 1);
+		}
+		if (empty($fields)) {
+			return $this;
+		}
+		$conditions = [];
+		$data = [];
+		foreach ($fields as $index => $field) {
+			$key = ':search_' . $index;
+			$conditions[] = "$field LIKE $key";
+			$data[$key] = '%' . $value . '%';
+		}
+		$this->pieces['where'][] = '(' . implode(' OR ', $conditions) . ')';
+		$this->pieces['data'] = array_merge($this->pieces['data'], $data);
+		return $this;
+	}
+
+	public function transaction(callable $callback): mixed {
+		self::$pdo->beginTransaction();
+		try {
+			$result = $callback($this);
+			self::$pdo->commit();
+			return $result;
+		} catch (Throwable $e) {
+			if (self::$pdo->inTransaction()) {
+				self::$pdo->rollBack();
+			}
+			throw new RuntimeException("ошибка транзакции: " . $e->getMessage(), 0, $e);
+		}
 	}
 
 	private function data(array $data = [], string $prefix = 'data'): void {
@@ -115,8 +292,11 @@ class Database {
 		$this->pieces = [
 			'where' => [],
 			'limit' => null,
+			'order' => null,
 			'keys' => [],
 			'data' => [],
+			'selectColumns' => [],
+			'pagination' => false,
 		];
 	}
 
@@ -152,16 +332,30 @@ class Database {
 			case 'delete':
 				$sql = "DELETE FROM {$this->tableName}";
 				break;
+			case 'count':
+				$sql = "SELECT COUNT(*) AS count FROM {$this->tableName}";
+				break;
 		}
 
 		if (empty($sql)) return false;
 
-		if (in_array($type, ['select', 'delete', 'update'])) {
-			if (!empty($this->pieces['where'])) $sql .= ' WHERE ' . implode(' AND ', $this->pieces['where']);
-			if (!empty($this->pieces['limit'])) $sql .= ' ' . $this->pieces['limit'];
+		if (in_array($type, ['select', 'count', 'delete', 'update'])) {
+			if (!empty($this->pieces['where'])) {
+				$sql .= ' WHERE ' . implode(' AND ', $this->pieces['where']);
+			}
+			if ($type === 'select' && !empty($this->pieces['order'])) {
+				$sql .= ' ORDER BY ' . $this->pieces['order'];
+			}
+			if (in_array($type, ['select', 'delete', 'update']) && !empty($this->pieces['limit'])) {
+				$sql .= ' ' . $this->pieces['limit'];
+			}
 		}
 
-		return ($sql) ? $this->query($sql, $this->pieces['data'], $fetch) : false;
+		try {
+			return ($sql) ? $this->query($sql, $this->pieces['data'], $fetch) : false;
+		} finally {
+			$this->clearPieces();
+		}
 	}
 
 	private function query(string $sql, array $data = [], string $fetch = 'none'): mixed {

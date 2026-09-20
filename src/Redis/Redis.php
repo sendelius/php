@@ -2,6 +2,7 @@
 
 namespace Sendelius\Redis;
 
+use JsonException;
 use Redis as RedisClient;
 use RedisException;
 use RuntimeException;
@@ -10,10 +11,9 @@ use Sendelius\Config\Env;
 class Redis {
 	private static RedisClient $redis;
 	private static bool $connect = false;
-	private string $prefix;
 
 	public function __construct(
-		?string $prefix = null,
+		private ?string $prefix = null,
 	) {
 		if (!self::$connect) {
 			try {
@@ -38,15 +38,43 @@ class Redis {
 	}
 
 	public function get(string $key): mixed {
-		return self::$redis->get($this->key($key));
+		$value = self::$redis->get($this->key($key));
+		if ($value === false || $value === null) {
+			return $value;
+		}
+		if (json_validate($value)) {
+			$decoded = json_decode($value, true);
+			if (is_array($decoded)) {
+				return $decoded;
+			}
+		}
+		return $value;
 	}
 
-	public function set(string $key, mixed $value, ?int $ttl = null): bool {
-		$key = $this->key($key);
-		if ($ttl !== null) {
-			return self::$redis->setex($key, $ttl, $value);
+	public function set(string $key, mixed $value, ?int $ttl = null, bool $onlyIfNotExists = false): bool {
+		if (is_array($value) || is_object($value)) {
+			try {
+				$value = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+			} catch (JsonException $e) {
+				throw new RuntimeException("ошибка обработки json: " . $e->getMessage(), 0, $e);
+			}
 		}
-		return self::$redis->set($key, $value);
+		$options = [];
+		if ($ttl !== null) {
+			$options['EX'] = $ttl;
+		}
+		if ($onlyIfNotExists) {
+			$options['NX'] = true;
+		}
+		if ($options !== []) {
+			return self::$redis->set($this->key($key), $value, $options);
+		}
+		return self::$redis->set($this->key($key), $value);
+	}
+
+	public function eval(string $script, array $keys = [], array $args = []): mixed {
+		$keys = array_map(fn(string $key): string => $this->key($key), $keys);
+		return self::$redis->eval($script, [...$keys, ...$args], count($keys));
 	}
 
 	public function delete(string $key): bool {
@@ -91,9 +119,5 @@ class Redis {
 		} while ($iterator !== 0);
 
 		return true;
-	}
-
-	public function raw(): RedisClient {
-		return self::$redis;
 	}
 }
