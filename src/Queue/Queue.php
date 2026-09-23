@@ -6,33 +6,32 @@ use JsonException;
 use Ramsey\Uuid\Uuid;
 use Random\RandomException;
 use RuntimeException;
+use Sendelius\Config\Env;
 use Sendelius\Db\Database;
+use Sendelius\Db\MySQL;
+use Sendelius\Db\PostgreSQL;
 use Sendelius\Redis\Redis;
 use Throwable;
 
-class Queue {
-	private const string LOCK = 'process';
-	private const int LOCK_TTL = 3600;
-	private const int MAX_ATTEMPTS = 3;
-
+final class Queue {
 	private array $handlers = [];
 	private ?string $lockToken = null;
 	private QueueStorageFactory $storageFactory;
 
-	public function __construct(
-		private readonly string $databaseTable = 'queue',
-		private readonly string $redisPrefix = 'queue',
-	) {
+	public function __construct() {
 		$this->storageFactory = new QueueStorageFactory(APP_DIR . 'storage' . DS . 'queue' . DS);
 	}
 
-	public function table(): Database {
-		return (new Database())->table($this->databaseTable);
+	private function table(): MySQL|PostgreSQL {
+		return match (Env::string('QUEUE_DB_TYPE', 'mysql')) {
+			'postgresql' => (new PostgreSQL())->table(Env::string('QUEUE_DB_TABLE', 'queue')),
+			default => (new MySQL())->table(Env::string('QUEUE_DB_TABLE', 'queue')),
+		};
 	}
 
-	public function redis(): Redis {
+	private function redis(): Redis {
 		return new Redis(
-			prefix: $this->redisPrefix,
+			prefix: 'queue',
 		);
 	}
 
@@ -122,8 +121,9 @@ class Queue {
 	// Получить следующую задачу
 	private function next(): ?array {
 		return $this->table()->transaction(function (Database $database): ?array {
+			$table = Env::string('QUEUE_DB_TABLE', 'queue');
 			$job = $database->custom("SELECT *
-            FROM {$this->databaseTable}
+            FROM {$table}
             WHERE status = 'pending'
               AND available_at <= NOW()
             ORDER BY id
@@ -166,7 +166,7 @@ class Queue {
 			($config['handler'])($job);
 			$this->done((string)$data['id']);
 		} catch (Throwable $e) {
-			if ((int)$data['attempts'] >= self::MAX_ATTEMPTS) {
+			if ((int)$data['attempts'] >= Env::int('QUEUE_MAX_ATTEMPTS', 3)) {
 				$this->failed((string)$data['id'], $e->getMessage());
 			} else {
 				$this->retry((string)$data['id'], 60, $e->getMessage());
@@ -233,9 +233,9 @@ class Queue {
 			throw new RuntimeException("ошибка random_bytes: " . $e->getMessage(), 0, $e);
 		}
 		$result = $this->redis()->set(
-			self::LOCK,
+			Env::string('QUEUE_LOCK_KEY', 'process'),
 			$this->lockToken,
-			self::LOCK_TTL,
+			Env::int('QUEUE_LOCK_TTL', 3600),
 			true,
 		);
 		if (!$result) {
@@ -258,7 +258,7 @@ class Queue {
 		";
 		(bool)$this->redis()->eval(
 			$script,
-			[self::LOCK],
+			[Env::string('QUEUE_LOCK_KEY', 'process')],
 			[$this->lockToken],
 		);
 		$this->lockToken = null;

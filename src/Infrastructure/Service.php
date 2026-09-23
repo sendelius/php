@@ -2,14 +2,24 @@
 
 namespace Sendelius\Infrastructure;
 
-use Sendelius\Db\Database;
+use Sendelius\Db\Manticore;
+use Sendelius\Db\MySQL;
+use Sendelius\Db\PostgreSQL;
 use Sendelius\Logger\Logger;
 use Sendelius\Progress\Progress;
 use Sendelius\Redis\Redis;
 
 class Service {
-	public function table(string $table): Database {
-		return (new Database())->table($table);
+	public function mysql(string $table): MySQL {
+		return (new MySQL())->table($table);
+	}
+
+	public function postgresql(string $table): PostgreSQL {
+		return (new PostgreSQL())->table($table);
+	}
+
+	public function manticore(string $table): Manticore {
+		return (new Manticore())->table($table);
 	}
 
 	public function redis(?string $prefix = null): Redis {

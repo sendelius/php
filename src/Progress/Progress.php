@@ -18,7 +18,7 @@ class Progress {
 		$this->id = (!$id) ? Uuid::uuid4()->toString() : $id;
 	}
 
-	public function redis(): Redis {
+	private function redis(): Redis {
 		return new Redis(
 			prefix: $this->redisPrefix,
 		);

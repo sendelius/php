@@ -5,15 +5,13 @@ namespace Sendelius\Db;
 use PDO;
 use PDOException;
 use RuntimeException;
-use Sendelius\Config\Env;
 use Throwable;
 
-class Database {
-	private static PDO $pdo;
-	private static bool $connect = false;
-	private string $tableName = 'snd_table';
-
-	private array $pieces = [
+abstract class Database {
+	protected static PDO $pdo;
+	protected static bool $connect = false;
+	protected string $tableName = 'snd_table';
+	protected array $pieces = [
 		'where' => [],
 		'limit' => null,
 		'order' => null,
@@ -23,34 +21,27 @@ class Database {
 		'pagination' => false,
 	];
 
-	public function __construct() {
+	protected function connect(string $dsn, string $username = 'root', string $password = ''): void {
 		if (!self::$connect) {
 			try {
-				$driver = Env::string('DATABASE_DRIVER', 'mysql');
-				$host = Env::string('DATABASE_HOST', '127.0.0.1');
-				$port = Env::int('DATABASE_PORT', 3306);
-				$db = Env::string('DATABASE_DB', 'snd_db');
-				$user = Env::string('DATABASE_USER', 'root');
-				$password = Env::string('DATABASE_PASSWORD');
-				$charset = Env::string('DATABASE_CHARSET', 'utf8mb4');
-				self::$pdo = new PDO(
-					dsn: $driver . ':dbname=' . $db . ';host=' . $host . ';port=' . $port . ';charset=' . $charset,
-					username: $user,
+				static::$pdo = new PDO(
+					dsn: $dsn,
+					username: $username,
 					password: $password,
 				);
-				self::$connect = true;
+				static::$connect = true;
 			} catch (PDOException $e) {
 				throw new RuntimeException("ошибка подключения к базе данных: " . $e->getMessage(), 0, $e);
 			}
 		}
 	}
 
-	public function table(string $table): self {
+	public function table(string $table): static {
 		$this->tableName = $table;
 		return $this;
 	}
 
-	public function pagination(int $page = 1, int $limit = 100): self {
+	public function pagination(int $page = 1, int $limit = 100): static {
 		$page = max(1, $page);
 		$limit = min(max(1, $limit), 1000);
 		$this->pieces['pagination'] = ['page' => $page, 'limit' => $limit];
@@ -102,11 +93,10 @@ class Database {
 		if (count($data) === 0) {
 			return 0;
 		}
-
 		$this->data($data, 'insert');
 		$result = $this->buildQuery('insert');
 		if ($result) {
-			return intval(self::$pdo->lastInsertId());
+			return intval(static::$pdo->lastInsertId());
 		} else return 0;
 	}
 
@@ -156,12 +146,7 @@ class Database {
 				}
 				$values[] = '(' . implode(',', $placeholders) . ')';
 			}
-			$sql = sprintf(
-				'INSERT INTO %s (%s) VALUES %s',
-				$this->tableName,
-				implode(',', $columns),
-				implode(',', $values)
-			);
+			$sql = $this->buildMultiInsertQuery($columns, $values);
 			if ($this->query($sql, $data)) {
 				$total += count($chunk);
 			}
@@ -201,7 +186,7 @@ class Database {
 		return $total;
 	}
 
-	public function where(array $conditions): self {
+	public function where(array $conditions): static {
 		foreach ($conditions as $field => $condition) {
 			$this->data([$field => $condition], 'where');
 			$key = (array_key_exists($field, $this->pieces['keys'])) ? $this->pieces['keys'][$field] : null;
@@ -210,13 +195,13 @@ class Database {
 		return $this;
 	}
 
-	public function limit(int $rows = 0, int $offset = 0): self {
+	public function limit(int $rows = 0, int $offset = 0): static {
 		if ($offset > 0) $this->pieces['limit'] = "LIMIT " . $offset . "," . $rows;
 		else $this->pieces['limit'] = "LIMIT " . $rows;
 		return $this;
 	}
 
-	public function filter(array $filters, array $fields = []): self {
+	public function filter(array $filters, array $fields = []): static {
 		foreach ($filters as $field => $value) {
 			if (!empty($fields) && !in_array($field, $fields, true)) {
 				continue;
@@ -226,7 +211,7 @@ class Database {
 		return $this;
 	}
 
-	public function sort(string $field, string $type = 'asc', array $allowFields = []): self {
+	public function sort(string $field, string $type = 'asc', array $allowFields = []): static {
 		if (!empty($allowFields) && !in_array($field, $allowFields, true)) {
 			return $this;
 		}
@@ -235,49 +220,21 @@ class Database {
 		return $this;
 	}
 
-	public function search(string $value, string $field = '', array $allowFields = []): self {
-		if ($value === '') {
-			return $this;
-		}
-		if (empty($allowFields)) {
-			$allowFields = ['title'];
-		}
-		if ($field !== '') {
-			$requested = array_map('trim', explode(',', $field));
-			$fields = array_values(array_intersect($requested, $allowFields));
-		} else {
-			$fields = array_slice($allowFields, 0, 1);
-		}
-		if (empty($fields)) {
-			return $this;
-		}
-		$conditions = [];
-		$data = [];
-		foreach ($fields as $index => $field) {
-			$key = ':search_' . $index;
-			$conditions[] = "$field LIKE $key";
-			$data[$key] = '%' . $value . '%';
-		}
-		$this->pieces['where'][] = '(' . implode(' OR ', $conditions) . ')';
-		$this->pieces['data'] = array_merge($this->pieces['data'], $data);
-		return $this;
-	}
-
 	public function transaction(callable $callback): mixed {
-		self::$pdo->beginTransaction();
+		static::$pdo->beginTransaction();
 		try {
 			$result = $callback($this);
-			self::$pdo->commit();
+			static::$pdo->commit();
 			return $result;
 		} catch (Throwable $e) {
-			if (self::$pdo->inTransaction()) {
-				self::$pdo->rollBack();
+			if (static::$pdo->inTransaction()) {
+				static::$pdo->rollBack();
 			}
 			throw new RuntimeException("ошибка транзакции: " . $e->getMessage(), 0, $e);
 		}
 	}
 
-	private function data(array $data = [], string $prefix = 'data'): void {
+	protected function data(array $data = [], string $prefix = 'data'): void {
 		$firstKeys = array_keys($data);
 		$keys = array_keys($data);
 		$keys = preg_replace('/^/', ':' . $prefix . '_', $keys, 1);
@@ -288,7 +245,7 @@ class Database {
 		$this->pieces['data'] = array_merge($this->pieces['data'], $data);
 	}
 
-	private function clearPieces(): void {
+	protected function clearPieces(): void {
 		$this->pieces = [
 			'where' => [],
 			'limit' => null,
@@ -300,67 +257,9 @@ class Database {
 		];
 	}
 
-	private function buildQuery(string $type, string $fetch = 'none'): mixed {
-		$sql = '';
-
-		switch ($type) {
-			case 'select':
-				$select = '*';
-				if (count($this->pieces['selectColumns']) > 0) $select = implode(', ', $this->pieces['selectColumns']);
-				$sql = "SELECT $select FROM {$this->tableName}";
-				break;
-			case 'insert':
-				$sqlFormat = "INSERT INTO {$this->tableName} (%s) VALUE (%s)";
-				$sql = sprintf(
-					$sqlFormat,
-					implode(',', array_keys($this->pieces['keys'])),
-					implode(',', array_keys($this->pieces['data']))
-				);
-				break;
-			case 'update':
-				if (empty($this->pieces['where'])) {
-					throw new RuntimeException("ошибка базы данных: update без условий where невозможен");
-				}
-				$set = [];
-				foreach ($this->pieces['keys'] as $field => $key) {
-					if (str_starts_with($key, ':update_')) {
-						$set[] = "$field = $key";
-					}
-				}
-				$sql = "UPDATE {$this->tableName} SET " . implode(', ', $set);
-				break;
-			case 'delete':
-				$sql = "DELETE FROM {$this->tableName}";
-				break;
-			case 'count':
-				$sql = "SELECT COUNT(*) AS count FROM {$this->tableName}";
-				break;
-		}
-
-		if (empty($sql)) return false;
-
-		if (in_array($type, ['select', 'count', 'delete', 'update'])) {
-			if (!empty($this->pieces['where'])) {
-				$sql .= ' WHERE ' . implode(' AND ', $this->pieces['where']);
-			}
-			if ($type === 'select' && !empty($this->pieces['order'])) {
-				$sql .= ' ORDER BY ' . $this->pieces['order'];
-			}
-			if (in_array($type, ['select', 'delete', 'update']) && !empty($this->pieces['limit'])) {
-				$sql .= ' ' . $this->pieces['limit'];
-			}
-		}
-
+	protected function query(string $sql, array $data = [], string $fetch = 'none'): mixed {
 		try {
-			return ($sql) ? $this->query($sql, $this->pieces['data'], $fetch) : false;
-		} finally {
-			$this->clearPieces();
-		}
-	}
-
-	private function query(string $sql, array $data = [], string $fetch = 'none'): mixed {
-		try {
-			$sqlObj = self::$pdo->prepare($sql);
+			$sqlObj = static::$pdo->prepare($sql);
 			$result = $sqlObj->execute($data);
 			if ($result && $fetch == 'all') {
 				$result = $sqlObj->fetchAll(PDO::FETCH_ASSOC);
@@ -372,4 +271,10 @@ class Database {
 			throw new RuntimeException("ошибка базы данных: " . $e->getMessage(), 0, $e);
 		}
 	}
+
+	abstract protected function buildQuery(string $type, string $fetch = 'none'): mixed;
+
+	abstract protected function buildMultiInsertQuery(array $columns, array $values): string;
+
+	abstract public function search(string $value, string $field = '', array $allowFields = []): static;
 }
