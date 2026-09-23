@@ -3,13 +3,20 @@
 namespace Sendelius\Queue;
 
 use JsonException;
+use Random\RandomException;
 use RuntimeException;
 
-readonly class QueueStorage {
-	public function __construct(
-		private string $directory,
-		private string $id,
-	) {
+final class Storage {
+	private string $directory;
+	private string $id;
+
+	public function __construct(?string $id = null) {
+		try {
+			$this->id = (empty($id)) ? bin2hex(random_bytes(16)) : $id;
+		} catch (RandomException $e) {
+			throw new RuntimeException("ошибка random_bytes: " . $e->getMessage(), 0, $e);
+		}
+		$this->directory = APP_DIR . 'storage' . DS . 'queue' . DS . $this->id . DS;
 		if (!is_dir($this->directory) && !mkdir($this->directory, 0775, true) && !is_dir($this->directory)) {
 			throw new RuntimeException("не удалось создать хранилище очереди");
 		}

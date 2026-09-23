@@ -7,6 +7,9 @@ use Sendelius\Db\MySQL;
 use Sendelius\Db\PostgreSQL;
 use Sendelius\Logger\Logger;
 use Sendelius\Progress\Progress;
+use Sendelius\Queue\Container;
+use Sendelius\Queue\Push;
+use Sendelius\Queue\Register;
 use Sendelius\Redis\Redis;
 
 class Service {
@@ -32,6 +35,10 @@ class Service {
 		return new Progress(
 			id: $id,
 		);
+	}
+
+	public function queue(): Push {
+		return Container::push();
 	}
 
 	public function log(string $name, mixed $data, bool $append = true): void {

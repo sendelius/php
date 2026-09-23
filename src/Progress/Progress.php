@@ -5,22 +5,22 @@ namespace Sendelius\Progress;
 use JsonException;
 use Ramsey\Uuid\Uuid;
 use RuntimeException;
+use Sendelius\Config\Env;
 use Sendelius\Redis\Redis;
 
 class Progress {
-	private const int TTL = 86400;
-	private string $id;
+	private static ?string $id = null;
 
 	public function __construct(
-		?string                 $id = null,
-		private readonly string $redisPrefix = 'progress',
+		?string $id = null,
 	) {
-		$this->id = (!$id) ? Uuid::uuid4()->toString() : $id;
+		if (!empty($id)) self::$id = $id;
+		elseif (!self::$id) self::$id = Uuid::uuid4()->toString();
 	}
 
 	private function redis(): Redis {
 		return new Redis(
-			prefix: $this->redisPrefix,
+			prefix: 'progress',
 		);
 	}
 
@@ -69,7 +69,8 @@ class Progress {
 	}
 
 	public function get(): ?array {
-		$value = $this->redis()->get($this->id);
+		if (!self::$id) return null;
+		$value = $this->redis()->get(self::$id);
 		if ($value === false || $value === null) {
 			return null;
 		}
@@ -81,15 +82,16 @@ class Progress {
 	}
 
 	public function exists(): bool {
-		return $this->redis()->exists($this->id);
+		return self::$id && $this->redis()->exists(self::$id);
 	}
 
 	public function delete(): bool {
-		return $this->redis()->delete($this->id);
+		return self::$id && $this->redis()->delete(self::$id);
 	}
 
 	private function set(array $data): bool {
+		if (!self::$id) return false;
 		$data['updated_at'] = time();
-		return $this->redis()->set($this->id, $data, self::TTL);
+		return $this->redis()->set(self::$id, $data, Env::int('PROGRESS_TTL', 86400));
 	}
 }

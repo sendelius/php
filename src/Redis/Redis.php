@@ -15,15 +15,13 @@ class Redis {
 	public function __construct(
 		private ?string $prefix = null,
 	) {
+		$envPrefix = Env::string('REDIS_PREFIX');
+		$prefixes = array_filter([$envPrefix, $prefix], static fn(?string $value): bool => !empty($value));
+		$this->prefix = $prefixes ? implode(':', array_map(static fn(string $value): string => trim($value, ':'), $prefixes)) . ':' : '';
 		if (!self::$connect) {
 			try {
 				$host = Env::string('REDIS_HOST', '127.0.0.1');
 				$port = Env::int('REDIS_PORT', 6379);
-
-				$envPrefix = Env::string('REDIS_PREFIX');
-				$prefixes = array_filter([$envPrefix, $prefix], static fn(?string $value): bool => !empty($value));
-				$this->prefix = $prefixes ? implode(':', array_map(static fn(string $value): string => trim($value, ':'), $prefixes)) . ':' : '';
-
 				self::$redis = new RedisClient();
 				self::$redis->connect($host, $port);
 				self::$connect = true;
@@ -60,13 +58,13 @@ class Redis {
 			}
 		}
 		$options = [];
+		if ($onlyIfNotExists) {
+			$options[] = 'NX';
+		}
 		if ($ttl !== null) {
 			$options['EX'] = $ttl;
 		}
-		if ($onlyIfNotExists) {
-			$options['NX'] = true;
-		}
-		if ($options !== []) {
+		if (!empty($options)) {
 			return self::$redis->set($this->key($key), $value, $options);
 		}
 		return self::$redis->set($this->key($key), $value);
