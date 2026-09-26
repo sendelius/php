@@ -81,12 +81,12 @@ final class Process extends Resources {
 
 	// Выполнить задачу
 	private function run(array $data): void {
-		$handler = Container::getHandler($data['queue']);
-		if (!$handler) {
-			throw new RuntimeException("обработчик очереди не найден: {$data['queue']}");
-		}
-		$job = new Job($data);
 		try {
+			$handler = Container::getHandler($data['queue']);
+			if (!$handler) {
+				throw new RuntimeException("обработчик очереди не найден: {$data['queue']}");
+			}
+			$job = new Job($data);
 			($handler['handler'])($job);
 			$this->done((string)$data['id']);
 		} catch (Throwable $e) {
@@ -165,20 +165,33 @@ final class Process extends Resources {
 				$storageIds[$job['storage_id']] = true;
 			}
 		}
+		foreach (array_keys($storageIds) as $storageId) {
+			$this->cleanupStorage($storageId, $finishedAt);
+		}
 		$this->table()->where([
 			'status' => 'failed',
 			'finished_at <' => $finishedAt,
 		])->delete();
-		foreach (array_keys($storageIds) as $storageId) {
-			$this->cleanupStorage($storageId);
-		}
 	}
 
-	private function cleanupStorage(string $storageId): void {
-		$count = $this->table()->where(['storage_id' => $storageId])->count();
+	private function cleanupStorage(string $storageId, string $finishedAt): void {
+		$count = $this->table()->where([
+			'storage_id' => $storageId,
+			'status !=' => 'failed',
+		])->count();
 		if ($count > 0) {
 			return;
 		}
+
+		$count = $this->table()->where([
+			'storage_id' => $storageId,
+			'status' => 'failed',
+			'finished_at >=' => $finishedAt,
+		])->count();
+		if ($count > 0) {
+			return;
+		}
+
 		$storage = Container::storageById($storageId);
 		$storage->clear();
 	}
