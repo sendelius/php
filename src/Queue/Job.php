@@ -2,14 +2,14 @@
 
 namespace Sendelius\Queue;
 
-readonly class Job {
+final class Job {
 	public function __construct(
 		private array $data,
 	) {
 	}
 
-	public function id(): int {
-		return (int)$this->data['id'];
+	public function id(): string {
+		return (string)$this->data['id'];
 	}
 
 	public function queue(): string {
@@ -25,17 +25,18 @@ readonly class Job {
 
 	public function storage(): ?Storage {
 		if (empty($this->data['storage_id'])) {
-			return null;
+			$storage = Container::storage();
+			$this->data['storage_id'] = $storage->id();
 		}
 		return Container::storageById($this->data['storage_id']);
 	}
 
 	public function next(?string $queue = null, ?array $payload = null): int {
-		$push = Container::push();
-		return $push->push(
+		return Container::push()->push(
 			queue: $queue ?? $this->queue(),
 			payload: $payload,
-			storageId: $this->storage()->id(),
+			availableAt: date('Y-m-d H:i:s'),
+			storageId: $this->data['storage_id'],
 		);
 	}
 

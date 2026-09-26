@@ -72,6 +72,10 @@ final class Storage {
 		foreach ($this->list() as $key) {
 			$this->delete($key);
 		}
+		if (is_dir($this->directory)) {
+			rmdir($this->directory);
+		}
+		Container::deleteStorage($this->id);
 	}
 
 	private function file(string $key): string {

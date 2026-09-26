@@ -188,9 +188,29 @@ abstract class Database {
 
 	public function where(array $conditions): static {
 		foreach ($conditions as $field => $condition) {
+			$parts = explode(' ', trim($field), 2);
+			$field = $parts[0];
+			$operator = strtoupper($parts[1] ?? '=');
+			if (!in_array($operator, ['=', '!=', '<>', '>', '>=', '<', '<=', 'IN', 'NOT IN'], true)) {
+				throw new RuntimeException("ошибка базы данных: неизвестный оператор '$operator'");
+			}
+			if (in_array($operator, ['IN', 'NOT IN'], true)) {
+				if (!is_array($condition) || empty($condition)) {
+					continue;
+				}
+				$keys = [];
+				foreach ($condition as $index => $value) {
+					$key = ':where_' . $field . '_' . $index;
+					$this->pieces['keys'][$field . '_' . $index] = $key;
+					$this->pieces['data'][$key] = $value;
+					$keys[] = $key;
+				}
+				$this->pieces['where'][] = "$field $operator (" . implode(',', $keys) . ")";
+				continue;
+			}
 			$this->data([$field => $condition], 'where');
-			$key = (array_key_exists($field, $this->pieces['keys'])) ? $this->pieces['keys'][$field] : null;
-			$this->pieces['where'][] = "$field = $key";
+			$key = $this->pieces['keys'][$field] ?? null;
+			$this->pieces['where'][] = "$field $operator $key";
 		}
 		return $this;
 	}

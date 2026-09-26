@@ -17,8 +17,11 @@ final class Process extends Resources {
 			return 0;
 		}
 		$processed = 0;
+		$deadline = time() + Env::int('QUEUE_MAX_TIME', 3600);
 		try {
-			while ($processed < Env::int('QUEUE_LIMIT', 100)) {
+			$this->cleanup();
+			ini_set('max_execution_time', (string)Env::int('QUEUE_MAX_TIME', 3600));
+			while ($processed < Env::int('QUEUE_LIMIT', 100) && time() < $deadline) {
 				$job = $this->next();
 				if (!$job) {
 					break;
@@ -100,7 +103,6 @@ final class Process extends Resources {
 		if (!$job) {
 			return;
 		}
-
 		if ((int)$job['permanent'] === 1) {
 			$this->table()->where(['id' => $id])->update([
 				'status' => 'pending',
@@ -111,13 +113,7 @@ final class Process extends Resources {
 			]);
 			return;
 		}
-
-		$this->table()->where(['id' => $id])->update([
-			'status' => 'done',
-			'finished_at' => date('Y-m-d H:i:s'),
-			'error' => null,
-			'attempts' => 0,
-		]);
+		$this->table()->where(['id' => $id])->delete();
 	}
 
 	// Вернуть задачу в очередь
@@ -152,6 +148,13 @@ final class Process extends Resources {
 		]);
 	}
 
+	private function cleanup(): void {
+		$this->table()->where([
+			'status' => 'failed',
+			'finished_at <' => date('Y-m-d H:i:s', time() - 604800),
+		])->delete();
+	}
+
 	// Заблокировать worker
 	private function lock(): bool {
 		try {
@@ -160,9 +163,9 @@ final class Process extends Resources {
 			throw new RuntimeException("ошибка random_bytes: " . $e->getMessage(), 0, $e);
 		}
 		$result = $this->redis()->set(
-			Env::string('QUEUE_LOCK_KEY', 'process'),
+			'process',
 			$this->lockToken,
-			Env::int('QUEUE_LOCK_TTL', 3600),
+			Env::int('QUEUE_MAX_TIME', 3600),
 			true,
 		);
 		if (!$result) {
@@ -185,7 +188,7 @@ final class Process extends Resources {
 		";
 		(bool)$this->redis()->eval(
 			$script,
-			[Env::string('QUEUE_LOCK_KEY', 'process')],
+			['process'],
 			[$this->lockToken],
 		);
 		$this->lockToken = null;

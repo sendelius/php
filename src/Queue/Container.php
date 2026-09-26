@@ -48,4 +48,8 @@ class Container {
 	public static function setHandler(string $queue, callable $handler, int $interval = 0): void {
 		self::$handlers[$queue] = ['handler' => $handler, 'interval' => $interval];
 	}
+
+	public static function deleteStorage(string $id): void {
+		unset(self::$storages[$id]);
+	}
 }

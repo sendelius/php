@@ -35,11 +35,13 @@ class App {
 		$this->response = new Response();
 
 		set_exception_handler(function (Throwable $exception): void {
-			Logger::write('errors', [
+			$error = [
 				'error' => $exception->getMessage(),
 				'file' => 'file: ' . $exception->getFile(),
 				'line' => 'line: ' . $exception->getLine(),
-			]);
+			];
+			if (DEV_MODE) $error['trace'] = $exception->getTrace();
+			Logger::write('errors', $error);
 			$this->response->status(500);
 			$this->response->error((DEV_MODE) ? $exception->getMessage() : 'ошибка на сервере');
 		});
