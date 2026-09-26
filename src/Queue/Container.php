@@ -11,6 +11,7 @@ class Container {
 	 */
 	private static array $storages = [];
 	private static array $handlers = [];
+	private static ?string $currentId = null;
 
 	public static function process(): Process {
 		if (!self::$process) self::$process = new Process();
@@ -31,6 +32,7 @@ class Container {
 		if (!isset(self::$storages['current'])) {
 			$storage = new Storage();
 			self::$storages['current'] = $storage;
+			self::$currentId = $storage->id();
 			self::$storages[$storage->id()] = $storage;
 		}
 		return self::$storages['current'];
@@ -50,6 +52,10 @@ class Container {
 	}
 
 	public static function deleteStorage(string $id): void {
-		unset(self::$storages[$id]);
+		if (isset(self::$storages[$id])) unset(self::$storages[$id]);
+		if ($id == self::$currentId) {
+			self::$currentId = null;
+			if (isset(self::$storages['current'])) unset(self::$storages['current']);
+		}
 	}
 }

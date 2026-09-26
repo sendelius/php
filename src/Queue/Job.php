@@ -36,7 +36,7 @@ final class Job {
 			queue: $queue ?? $this->queue(),
 			payload: $payload,
 			availableAt: date('Y-m-d H:i:s'),
-			storageId: $this->data['storage_id'],
+			storageId: $this->data['storage_id'] ?? null,
 		);
 	}
 

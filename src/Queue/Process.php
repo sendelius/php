@@ -17,10 +17,12 @@ final class Process extends Resources {
 			return 0;
 		}
 		$processed = 0;
-		$deadline = time() + Env::int('QUEUE_MAX_TIME', 3600);
+		$maxTime = Env::int('QUEUE_MAX_TIME', 3600);
+		$jobMaxTime = Env::int('QUEUE_JOB_MAX_TIME', 1800);
+		$deadline = time() + $maxTime;
 		try {
 			$this->cleanup();
-			ini_set('max_execution_time', (string)Env::int('QUEUE_MAX_TIME', 3600));
+			ini_set('max_execution_time', (string)($maxTime + $jobMaxTime));
 			while ($processed < Env::int('QUEUE_LIMIT', 100) && time() < $deadline) {
 				$job = $this->next();
 				if (!$job) {
