@@ -2,7 +2,7 @@
 
 namespace Sendelius\Queue;
 
-class Container {
+final class Container {
 	private static ?Process $process = null;
 	private static ?Register $register = null;
 	private static ?Push $push = null;
@@ -43,19 +43,19 @@ class Container {
 		return self::$storages[$id];
 	}
 
-	public static function getHandler(string $queue): ?array {
-		return self::$handlers[$queue] ?? null;
-	}
-
-	public static function setHandler(string $queue, callable $handler, int $interval = 0): void {
-		self::$handlers[$queue] = ['handler' => $handler, 'interval' => $interval];
-	}
-
 	public static function deleteStorage(string $id): void {
 		if (isset(self::$storages[$id])) unset(self::$storages[$id]);
 		if ($id == self::$currentId) {
 			self::$currentId = null;
 			if (isset(self::$storages['current'])) unset(self::$storages['current']);
 		}
+	}
+
+	public static function getHandler(string $queue): ?array {
+		return self::$handlers[$queue] ?? null;
+	}
+
+	public static function setHandler(string $queue, callable $handler, int $interval = 0): void {
+		self::$handlers[$queue] = ['handler' => $handler, 'interval' => $interval];
 	}
 }

@@ -151,10 +151,36 @@ final class Process extends Resources {
 	}
 
 	private function cleanup(): void {
+		$finishedAt = date('Y-m-d H:i:s', time() - 604800);
+		$jobs = $this->table()->where([
+			'status' => 'failed',
+			'finished_at <' => $finishedAt,
+		])->list(['storage_id']);
+		if (!$jobs) {
+			return;
+		}
+		$storageIds = [];
+		foreach ($jobs as $job) {
+			if (!empty($job['storage_id'])) {
+				$storageIds[$job['storage_id']] = true;
+			}
+		}
 		$this->table()->where([
 			'status' => 'failed',
-			'finished_at <' => date('Y-m-d H:i:s', time() - 604800),
+			'finished_at <' => $finishedAt,
 		])->delete();
+		foreach (array_keys($storageIds) as $storageId) {
+			$this->cleanupStorage($storageId);
+		}
+	}
+
+	private function cleanupStorage(string $storageId): void {
+		$count = $this->table()->where(['storage_id' => $storageId])->count();
+		if ($count > 0) {
+			return;
+		}
+		$storage = Container::storageById($storageId);
+		$storage->clear();
 	}
 
 	// Заблокировать worker
@@ -164,10 +190,12 @@ final class Process extends Resources {
 		} catch (RandomException $e) {
 			throw new RuntimeException("ошибка random_bytes: " . $e->getMessage(), 0, $e);
 		}
+		$maxTime = Env::int('QUEUE_MAX_TIME', 3600);
+		$jobMaxTime = Env::int('QUEUE_JOB_MAX_TIME', 1800);
 		$result = $this->redis()->set(
 			'process',
 			$this->lockToken,
-			Env::int('QUEUE_MAX_TIME', 3600),
+			$maxTime + $jobMaxTime,
 			true,
 		);
 		if (!$result) {

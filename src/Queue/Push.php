@@ -6,7 +6,7 @@ use Ramsey\Uuid\Uuid;
 use JsonException;
 use RuntimeException;
 
-class Push extends Resources {
+final class Push extends Resources {
 	// Добавить задачу
 	public function push(string $queue, ?array $payload = null, ?string $availableAt = null, ?string $storageId = null): int {
 		try {
