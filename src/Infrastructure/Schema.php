@@ -15,7 +15,8 @@ abstract class Schema {
 
 	public function name(): string {
 		$baseName = basename(str_replace('\\', '/', static::class));
-		return strtolower(preg_replace(['Schema', '/(?<!^)[A-Z]/'], ['schema', '_$0'], $baseName));
+		$baseName = preg_replace('/Schema$/', '', $baseName);
+		return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $baseName));
 	}
 
 	protected function int(): ColumnInt {

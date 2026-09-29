@@ -2,11 +2,14 @@
 
 namespace Sendelius\Infrastructure;
 
+use Sendelius\Db\Schema\Registry;
 use Sendelius\Queue\Container;
+use Sendelius\Queue\QueueSchema;
 use Sendelius\Queue\Register;
 
 abstract class Queue {
 	protected function register(): Register {
+		Registry::add(QueueSchema::class);
 		return Container::register();
 	}
 

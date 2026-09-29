@@ -26,6 +26,16 @@ final class Registry {
 		return array_keys(self::$schemas);
 	}
 
+	public static function get(string $table): ?Schema {
+		foreach (self::$schemas as $schema => $value) {
+			$schema = new $schema();
+			if ($schema->name() === $table) {
+				return $schema;
+			}
+		}
+		return null;
+	}
+
 	public static function clear(): void {
 		self::$schemas = [];
 	}

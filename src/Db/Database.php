@@ -7,6 +7,7 @@ use PDOException;
 use RuntimeException;
 use Throwable;
 use Ramsey\Uuid\Uuid;
+use Sendelius\Db\Schema\Registry;
 
 abstract class Database {
 	protected static PDO $pdo;
@@ -326,6 +327,10 @@ abstract class Database {
 		} catch (PDOException $e) {
 			throw new RuntimeException("ошибка базы данных: " . $e->getMessage(), 0, $e);
 		}
+	}
+
+	protected function schema(): array {
+		return Registry::get($this->tableName)?->schema() ?? [];
 	}
 
 	protected function prepareAutoIds(array $data): array {
