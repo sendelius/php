@@ -221,16 +221,6 @@ abstract class Database {
 		return $this;
 	}
 
-	public function filter(array $filters, array $fields = []): static {
-		foreach ($filters as $field => $value) {
-			if (!empty($fields) && !in_array($field, $fields, true)) {
-				continue;
-			}
-			$this->where([$field => $value]);
-		}
-		return $this;
-	}
-
 	public function sort(string $field, string $type = 'asc', array $allowFields = []): static {
 		if (!empty($allowFields) && !in_array($field, $allowFields, true)) {
 			return $this;
