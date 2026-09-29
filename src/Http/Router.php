@@ -42,7 +42,6 @@ class Router {
 			$path = $route['path'];
 			$handler = $route['handler'];
 			$action = $route['action'];
-
 			$pattern = preg_replace_callback(
 				'#\{(\w+)(?::(\w+))?}#',
 				fn($m) => '(?P<' . $m[1] . '>' . $this->typePattern($m[2] ?? 'string') . ')',
@@ -50,17 +49,8 @@ class Router {
 			);
 			$pattern = "#^$pattern$#";
 			$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-
 			if (!$findRoute and $method === $_SERVER['REQUEST_METHOD'] and preg_match($pattern, $uri, $matches) and method_exists($handler, $action)) {
-
-				$session = ($this->protectedCallback !== null) ? ($this->protectedCallback)($route, $this) : null;
-				if ($protected and (!$session or empty($session))) {
-					$this->response->status(401);
-					$this->response->error('доступ запрещен');
-				}
-
 				$params = $this->getUriParams($matches, $path);
-
 				$allowEnv = Env::array('ALLOW_ROUTE_ENV');
 				$env = $params['env'] ?? null;
 				if (isset($params['env'])) unset($params['env']);
@@ -68,10 +58,15 @@ class Router {
 					$this->response->error('недопустимая среда');
 				}
 				define('APP_ENV', $env);
-
+				$request = new Request($params);
+				$session = ($this->protectedCallback !== null) ? ($this->protectedCallback)($route, $request) : null;
+				if ($protected and (!$session or empty($session))) {
+					$this->response->status(401);
+					$this->response->error('доступ запрещен');
+				}
 				$handler = new $handler(
 					response: $this->response,
-					request: new Request($params),
+					request: $request,
 					session: ($session and !empty($session)) ? $session : null,
 				);
 				$handler->$action();

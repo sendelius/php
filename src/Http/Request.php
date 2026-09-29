@@ -25,6 +25,14 @@ class Request {
 		return $this->query[$name] ?? $default;
 	}
 
+	public function getBearerToken(): ?string {
+		$header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? (function_exists('apache_request_headers') ? (apache_request_headers()['Authorization'] ?? '') : '');
+		if (preg_match('/^Bearer\s+(\S+)$/i', (string)$header, $matches)) {
+			return $matches[1];
+		}
+		return null;
+	}
+
 	private function parseJsonBody(): array {
 		$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
 		if (!str_contains($contentType, 'application/json')) return [];
