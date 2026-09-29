@@ -150,8 +150,28 @@ final class Process extends Resources {
 		]);
 	}
 
+	// Завершение зависших задач
+	private function failedProcessing(): void {
+		$maxTime = Env::int('QUEUE_MAX_TIME', 3600);
+		$jobMaxTime = Env::int('QUEUE_JOB_MAX_TIME', 1800);
+		$timeout = $maxTime + $jobMaxTime;
+		$finishedAt = date('Y-m-d H:i:s', time() - $timeout);
+		$this->table()->where([
+			'status' => 'processing',
+			'permanent' => 0,
+			'started_at <' => $finishedAt,
+		])->update([
+			'status' => 'failed',
+			'finished_at' => date('Y-m-d H:i:s'),
+			'error' => 'обработка задачи прервана из-за превышения времени worker',
+		]);
+	}
+
 	private function cleanup(): void {
-		$finishedAt = date('Y-m-d H:i:s', time() - 604800);
+		$this->failedProcessing();
+
+		$failedTtl = Env::int('QUEUE_FAILED_TTL', 604800); // 604800 = 7 дней
+		$finishedAt = date('Y-m-d H:i:s', time() - $failedTtl);
 		$jobs = $this->table()->where([
 			'status' => 'failed',
 			'finished_at <' => $finishedAt,
