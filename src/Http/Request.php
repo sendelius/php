@@ -25,10 +25,47 @@ class Request {
 		return $this->query[$name] ?? $default;
 	}
 
-	public function getBearerToken(): ?string {
-		$header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['Authorization'] ?? (function_exists('apache_request_headers') ? (apache_request_headers()['Authorization'] ?? '') : '');
-		if (preg_match('/^Bearer\s+(\S+)$/i', (string)$header, $matches)) {
+	public function bearerToken(): ?string {
+		$header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+		if (preg_match('/^Bearer\s+(\S+)$/i', $header, $matches)) {
 			return $matches[1];
+		}
+		return null;
+	}
+
+	public function domain(): string {
+		return $_SERVER['HTTP_HOST'] ?? '';
+	}
+
+	public function mainDomain(): string {
+		$parts = explode('.', $this->domain());
+		return implode('.', array_slice($parts, -2));
+	}
+
+	public function userIp(): string {
+		return $_SERVER['REMOTE_ADDR'] ?? '';
+	}
+
+	public function userAgent(): string {
+		return $_SERVER['HTTP_USER_AGENT'] ?? '';
+	}
+
+	public function browser(): ?string {
+		$userAgent = $this->userAgent();
+		if (stripos($userAgent, 'Windows') !== false) return 'Windows';
+		elseif (stripos($userAgent, 'Mac') !== false) return 'Mac';
+		elseif (stripos($userAgent, 'Linux') !== false) return 'Linux';
+		return null;
+	}
+
+	public function os(): ?string {
+		$userAgent = $this->userAgent();
+		if (preg_match('/Firefox\/([0-9.]+)/', $userAgent, $matches)) {
+			return 'Firefox ' . $matches[1];
+		} elseif (preg_match('/Chrome\/([0-9.]+)/', $userAgent, $matches)) {
+			return 'Chrome ' . $matches[1];
+		} elseif (preg_match('/Version\/([0-9.]+).*Safari/', $userAgent, $matches) && stripos($userAgent, 'Chrome') === false) {
+			return 'Safari ' . $matches[1];
 		}
 		return null;
 	}
