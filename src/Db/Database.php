@@ -186,10 +186,13 @@ abstract class Database {
 		return $total;
 	}
 
-	public function where(array $conditions): static {
+	public function where(array $conditions, array $allowFields = []): static {
 		foreach ($conditions as $field => $condition) {
 			$parts = explode(' ', trim($field), 2);
 			$field = $parts[0];
+			if (!empty($allowFields) && !in_array($field, $allowFields, true)) {
+				return $this;
+			}
 			$operator = strtoupper($parts[1] ?? '=');
 			if (!in_array($operator, ['=', '!=', '<>', '>', '>=', '<', '<=', 'IN', 'NOT IN'], true)) {
 				throw new RuntimeException("ошибка базы данных: неизвестный оператор '$operator'");
