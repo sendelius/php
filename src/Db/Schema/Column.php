@@ -21,10 +21,12 @@ abstract class Column {
 
 	public function primary(): static {
 		$this->primary = true;
+		$this->nullable = false;
 		if (in_array($this->type, ['int', 'bigint'])) {
 			$this->autoIncrement = true;
 		} elseif (in_array($this->type, ['varchar', 'char'])) {
 			$this->autoStringId = true;
+			if ($this->length === null) $this->length = 36;
 		}
 		return $this;
 	}

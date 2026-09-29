@@ -92,7 +92,7 @@ abstract class Database {
 		return $this->buildQuery('select', 'one');
 	}
 
-	public function insert(array $data): int {
+	public function insert(array $data): int|string {
 		if (count($data) === 0) {
 			return 0;
 		}
