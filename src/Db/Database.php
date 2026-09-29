@@ -20,6 +20,7 @@ abstract class Database {
 		'selectColumns' => [],
 		'pagination' => false,
 	];
+	protected static array $log = [];
 
 	protected function connect(string $dsn, string $username = 'root', string $password = ''): void {
 		if (!self::$connect) {
@@ -119,6 +120,7 @@ abstract class Database {
 	}
 
 	public function custom(string $sql, array $data = [], string $fetch = 'none'): mixed {
+		$sql = str_replace('{table}', $this->tableName, $sql);
 		return $this->query($sql, $data, $fetch);
 	}
 
@@ -247,6 +249,19 @@ abstract class Database {
 		}
 	}
 
+	public function getLastQuery(): string {
+		$log = $this->getLastLog();
+		return (isset($log['sql'])) ? $log['sql'] : '';
+	}
+
+	public function getLastLog(): array {
+		return (count(static::$log)) ? end(static::$log) : [];
+	}
+
+	public function getLog(): array {
+		return static::$log;
+	}
+
 	protected function data(array $data = [], string $prefix = 'data'): void {
 		$firstKeys = array_keys($data);
 		$keys = array_keys($data);
@@ -273,12 +288,25 @@ abstract class Database {
 	protected function query(string $sql, array $data = [], string $fetch = 'none'): mixed {
 		try {
 			$sqlObj = static::$pdo->prepare($sql);
-			$result = $sqlObj->execute($data);
+			foreach ($data as $key => $value) {
+				$type = match (true) {
+					is_int($value) => PDO::PARAM_INT,
+					is_bool($value) => PDO::PARAM_BOOL,
+					is_null($value) => PDO::PARAM_NULL,
+					default => PDO::PARAM_STR,
+				};
+				$sqlObj->bindValue($key, $value, $type);
+			}
+			$result = $sqlObj->execute();
 			if ($result && $fetch == 'all') {
 				$result = $sqlObj->fetchAll(PDO::FETCH_ASSOC);
 			} elseif ($result && $fetch == 'one') {
 				$result = $sqlObj->fetch(PDO::FETCH_ASSOC);
 			}
+			static::$log[] = [
+				'sql' => $sql,
+				'data' => $data,
+			];
 			return $result;
 		} catch (PDOException $e) {
 			throw new RuntimeException("ошибка базы данных: " . $e->getMessage(), 0, $e);

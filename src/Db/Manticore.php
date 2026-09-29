@@ -9,15 +9,16 @@ use Sendelius\Config\Env;
 class Manticore extends Database {
 	protected static PDO $pdo;
 	protected static bool $connect = false;
+	private static int $maxMatches = 0;
 
 	public function __construct() {
 		$host = Env::string('MANTICORE_HOST', '127.0.0.1');
 		$port = Env::int('MANTICORE_PORT', 9306);
-		$db = Env::string('MANTICORE_DB', 'snd_manticore');
 		$user = Env::string('MANTICORE_USER', 'root');
 		$password = Env::string('MANTICORE_PASSWORD');
+		$this->table(Env::string('MANTICORE_DB', 'manticore'));
 		$this->connect(
-			dsn: "mysql:dbname=$db;host=$host;port=$port",
+			dsn: "mysql:host=$host;port=$port",
 			username: $user,
 			password: $password,
 		);
@@ -46,6 +47,13 @@ class Manticore extends Database {
 		$key = ':search';
 		$this->pieces['where'][] = 'MATCH(' . $key . ')';
 		$this->pieces['data'][$key] = implode(' | ', $conditions);
+		return $this;
+	}
+
+	public function limit(int $rows = 0, int $offset = 0): static {
+		if ($offset > 0) $this->pieces['limit'] = "LIMIT " . $offset . "," . $rows;
+		else $this->pieces['limit'] = "LIMIT " . $rows;
+		self::$maxMatches = $rows;
 		return $this;
 	}
 
@@ -143,10 +151,14 @@ class Manticore extends Database {
 			if (in_array($type, ['select', 'delete', 'update']) && !empty($this->pieces['limit'])) {
 				$sql .= ' ' . $this->pieces['limit'];
 			}
+			if (self::$maxMatches !== 0) {
+				$sql .= ' OPTION max_matches = ' . self::$maxMatches;
+			}
 		}
 		try {
 			return ($sql) ? $this->query($sql, $this->pieces['data'], $fetch) : false;
 		} finally {
+			self::$maxMatches = 0;
 			$this->clearPieces();
 		}
 	}

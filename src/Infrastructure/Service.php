@@ -21,8 +21,8 @@ class Service {
 		return (new PostgreSQL())->table($table);
 	}
 
-	public function manticore(string $table): Manticore {
-		return (new Manticore())->table($table);
+	public function manticore(): Manticore {
+		return (new Manticore());
 	}
 
 	public function redis(?string $prefix = null): Redis {
