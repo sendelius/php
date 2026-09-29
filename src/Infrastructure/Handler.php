@@ -9,25 +9,25 @@ use Sendelius\Progress\Progress;
 use Sendelius\Queue\Container;
 use Sendelius\Queue\Process;
 
-class Handler {
-	public function __construct(
-		public Response $response,
-		public Request  $request,
-		public ?array   $session,
+abstract class Handler {
+	protected function __construct(
+		protected Response $response,
+		protected Request  $request,
+		protected ?array   $session,
 	) {
 	}
 
-	public function progress(?string $id = null): Progress {
+	protected function progress(?string $id = null): Progress {
 		return new Progress(
 			id: $id,
 		);
 	}
 
-	public function log(string $name, mixed $data, bool $append = true): void {
+	protected function log(string $name, mixed $data, bool $append = true): void {
 		Logger::write($name, $data, $append);
 	}
 
-	public function queue(): Process {
+	protected function queue(): Process {
 		return Container::process();
 	}
 }

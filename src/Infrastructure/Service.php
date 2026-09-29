@@ -12,36 +12,36 @@ use Sendelius\Queue\Push;
 use Sendelius\Queue\Register;
 use Sendelius\Redis\Redis;
 
-class Service {
-	public function mysql(string $table): MySQL {
+abstract class Service {
+	protected function mysql(string $table): MySQL {
 		return (new MySQL())->table($table);
 	}
 
-	public function postgresql(string $table): PostgreSQL {
+	protected function postgresql(string $table): PostgreSQL {
 		return (new PostgreSQL())->table($table);
 	}
 
-	public function manticore(): Manticore {
+	protected function manticore(): Manticore {
 		return (new Manticore());
 	}
 
-	public function redis(?string $prefix = null): Redis {
+	protected function redis(?string $prefix = null): Redis {
 		return new Redis(
 			prefix: $prefix,
 		);
 	}
 
-	public function progress(?string $id = null): Progress {
+	protected function progress(?string $id = null): Progress {
 		return new Progress(
 			id: $id,
 		);
 	}
 
-	public function queue(): Push {
+	protected function queue(): Push {
 		return Container::push();
 	}
 
-	public function log(string $name, mixed $data, bool $append = true): void {
+	protected function log(string $name, mixed $data, bool $append = true): void {
 		Logger::write($name, $data, $append);
 	}
 }

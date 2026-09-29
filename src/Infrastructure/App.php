@@ -11,11 +11,11 @@ use Sendelius\Http\Router;
 use Sendelius\Logger\Logger;
 use Throwable;
 
-class App {
-	private Response $response;
-	private Router $router;
+abstract class App {
+	protected Response $response;
+	protected Router $router;
 
-	public function init(
+	protected function init(
 		?Closure $protectedCallback = null,
 	): void {
 		date_default_timezone_set('Europe/Moscow');
@@ -53,19 +53,19 @@ class App {
 		);
 	}
 
-	public function publicRoute(string $path, string $handler, string $action): void {
+	protected function publicRoute(string $path, string $handler, string $action): void {
 		$this->router->route($path, $handler, $action);
 	}
 
-	public function protectedRoute(string $path, string $handler, string $action): void {
+	protected function protectedRoute(string $path, string $handler, string $action): void {
 		$this->router->route($path, $handler, $action, true);
 	}
 
-	public function start(): void {
+	protected function start(): void {
 		$this->router->start();
 	}
 
-	private function render(): void {
+	protected function render(): void {
 		$error = error_get_last();
 		if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
 			Logger::write('errors', [
