@@ -8,6 +8,7 @@ use ReflectionClass;
 use Sendelius\Config\Env;
 use Sendelius\Http\Response;
 use Sendelius\Http\Router;
+use Sendelius\Http\System;
 use Sendelius\Logger\Logger;
 use Throwable;
 
@@ -51,6 +52,8 @@ abstract class App {
 			response: $this->response,
 			protectedCallback: $protectedCallback
 		);
+
+		System::register($this->router);
 	}
 
 	protected function publicRoute(string $path, string $handler, string $action): void {

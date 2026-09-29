@@ -6,6 +6,7 @@ use PDO;
 use PDOException;
 use RuntimeException;
 use Throwable;
+use Ramsey\Uuid\Uuid;
 
 abstract class Database {
 	protected static PDO $pdo;
@@ -94,11 +95,21 @@ abstract class Database {
 		if (count($data) === 0) {
 			return 0;
 		}
+
+		$data = $this->prepareAutoIds($data);
 		$this->data($data, 'insert');
-		$result = $this->buildQuery('insert');
-		if ($result) {
-			return intval(static::$pdo->lastInsertId());
-		} else return 0;
+
+		if (!$this->buildQuery('insert')) {
+			return 0;
+		}
+
+		foreach ($this->schema() as $column => $definition) {
+			if ($definition->autoStringId()) {
+				return $data[$column];
+			}
+		}
+
+		return intval(static::$pdo->lastInsertId());
 	}
 
 	public function update(array $data): bool {
@@ -133,6 +144,10 @@ abstract class Database {
 		}
 		$total = 0;
 		foreach (array_chunk($rows, $chunkSize) as $chunk) {
+			$chunk = array_map(
+				fn(array $row) => $this->prepareAutoIds($row),
+				$chunk
+			);
 			$columns = array_keys($chunk[0]);
 			$values = [];
 			$data = [];
@@ -311,6 +326,15 @@ abstract class Database {
 		} catch (PDOException $e) {
 			throw new RuntimeException("ошибка базы данных: " . $e->getMessage(), 0, $e);
 		}
+	}
+
+	protected function prepareAutoIds(array $data): array {
+		foreach ($this->schema() as $column => $definition) {
+			if ($definition->autoStringId() && !array_key_exists($column, $data)) {
+				$data[$column] = Uuid::uuid4()->toString();
+			}
+		}
+		return $data;
 	}
 
 	abstract protected function buildQuery(string $type, string $fetch = 'none'): mixed;
