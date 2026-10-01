@@ -9,6 +9,7 @@ class QueueSchema extends Schema {
 	 * @column char
 	 * @length 36
 	 * @primary
+	 * @uuid
 	 */
 	public string $id;
 

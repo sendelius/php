@@ -2,10 +2,12 @@
 
 namespace Sendelius\Db;
 
+use JsonException;
 use PDO;
 use PDOException;
 use Ramsey\Uuid\Uuid;
 use RuntimeException;
+use Sendelius\Infrastructure\Schema;
 use Throwable;
 
 abstract class Database {
@@ -24,7 +26,7 @@ abstract class Database {
 	protected static array $log = [];
 
 	protected function connect(string $dsn, string $username = 'root', string $password = ''): void {
-		if (!self::$connect) {
+		if (!static::$connect) {
 			try {
 				static::$pdo = new PDO(
 					dsn: $dsn,
@@ -79,6 +81,7 @@ abstract class Database {
 			}
 		}
 		$items = $this->buildQuery('select', 'all') ?: [];
+		$items = array_map(fn(array $item) => $this->hydrate($item), $items);
 		if (!$pagination) {
 			return $items;
 		}
@@ -88,7 +91,8 @@ abstract class Database {
 	public function get(array $columns = []) {
 		$this->pieces['selectColumns'] = $columns;
 		$this->limit(1);
-		return $this->buildQuery('select', 'one');
+		$item = $this->buildQuery('select', 'one');
+		return $item ? $this->hydrate($item) : null;
 	}
 
 	public function insert(array $data): int|string {
@@ -96,16 +100,22 @@ abstract class Database {
 			return 0;
 		}
 
-		$data = $this->prepareAutoIds($data);
+		$schema = $this->schema();
+		if ($schema) {
+			$data = $this->prepareData($data);
+			$data = $this->prepareUuid($data);
+		}
 		$this->data($data, 'insert');
 
 		if (!$this->buildQuery('insert')) {
 			return 0;
 		}
 
-		foreach ($this->schema() as $column => $definition) {
-			if ($definition->autoStringId()) {
-				return $data[$column];
+		if ($schema) {
+			foreach ($schema->columns() as $columnName => $column) {
+				if (isset($column['primary']) && $column['primary'] && isset($column['uuid']) && $column['uuid']) {
+					return $data[$columnName];
+				}
 			}
 		}
 
@@ -116,7 +126,9 @@ abstract class Database {
 		if (count($data) === 0) {
 			return false;
 		}
-
+		if ($this->schema()) {
+			$data = $this->prepareData($data);
+		}
 		$this->data($data, 'update');
 		return (bool)$this->buildQuery('update');
 	}
@@ -143,11 +155,11 @@ abstract class Database {
 			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
 		}
 		$total = 0;
+		$schema = $this->schema();
 		foreach (array_chunk($rows, $chunkSize) as $chunk) {
-			$chunk = array_map(
-				fn(array $row) => $this->prepareAutoIds($row),
-				$chunk
-			);
+			if ($schema) {
+				$chunk = array_map(fn(array $row) => $this->prepareData($this->prepareUuid($row)), $chunk);
+			}
 			$columns = array_keys($chunk[0]);
 			$values = [];
 			$data = [];
@@ -179,8 +191,9 @@ abstract class Database {
 			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
 		}
 		$total = 0;
+		$schema = $this->schema();
 		foreach (array_chunk($rows, $chunkSize) as $chunk) {
-			$total += $this->transaction(function () use ($chunk) {
+			$total += $this->transaction(function () use ($chunk, $schema) {
 				$count = 0;
 				foreach ($chunk as $row) {
 					if (empty($row)) {
@@ -192,6 +205,9 @@ abstract class Database {
 					unset($data[$key]);
 					if (empty($data)) {
 						continue;
+					}
+					if ($schema) {
+						$data = $this->prepareData($data);
 					}
 					if ($this->where([$key => $value])->update($data)) {
 						$count++;
@@ -277,6 +293,10 @@ abstract class Database {
 		return static::$log;
 	}
 
+	public function quote(mixed $value): string {
+		return static::$pdo->quote($value);
+	}
+
 	protected function data(array $data = [], string $prefix = 'data'): void {
 		$firstKeys = array_keys($data);
 		$keys = array_keys($data);
@@ -328,17 +348,38 @@ abstract class Database {
 		}
 	}
 
-	protected function schema(): array {
-		return Registry::get($this->tableName)?->schema() ?? [];
+	protected function schema(): ?Schema {
+		return RegistrySchema::get($this->tableName);
 	}
 
-	protected function prepareAutoIds(array $data): array {
-		foreach ($this->schema() as $column => $definition) {
-			if ($definition->autoStringId() && !array_key_exists($column, $data)) {
-				$data[$column] = Uuid::uuid4()->toString();
+	protected function prepareUuid(array $data): array {
+		foreach ($this->schema()?->columns() as $columnName => $column) {
+			if (isset($column['uuid']) && $column['uuid'] && in_array($column['type'], ['char', 'varchar'], true) && !array_key_exists($columnName, $data)) {
+				$data[$columnName] = Uuid::uuid4()->toString();
 			}
 		}
 		return $data;
+	}
+
+	protected function prepareData(array $data): array {
+		foreach ($this->schema()?->columns() ?? [] as $column => $definition) {
+			if (($definition['type'] ?? null) !== 'json' || !array_key_exists($column, $data) || (!is_array($data[$column]) && !is_object($data[$column]))) {
+				continue;
+			}
+			try {
+				$data[$column] = json_encode($data[$column], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+			} catch (JsonException $e) {
+				throw new RuntimeException("ошибка обработки json: " . $e->getMessage(), 0, $e);
+			}
+		}
+		return $data;
+	}
+
+	protected function hydrate(array $data): object {
+		if ($schema = $this->schema()) {
+			return $schema->hydrate($data);
+		}
+		return (object)$data;
 	}
 
 	abstract protected function buildQuery(string $type, string $fetch = 'none'): mixed;

@@ -5,7 +5,6 @@ namespace Sendelius\Infrastructure;
 use Sendelius\Db\Manticore;
 use Sendelius\Db\MySQL;
 use Sendelius\Db\PostgreSQL;
-use Sendelius\Db\Registry;
 use Sendelius\Logger\Logger;
 use Sendelius\Progress\Progress;
 use Sendelius\Queue\Container;
@@ -13,16 +12,6 @@ use Sendelius\Queue\Push;
 use Sendelius\Redis\Redis;
 
 abstract class Service {
-	protected function schema(string|array $schema): void {
-		if (is_array($schema)) {
-			foreach ($schema as $schemaItem) {
-				Registry::add($schemaItem);
-			}
-		} else {
-			Registry::add($schema);
-		}
-	}
-
 	protected function mysql(string $table): MySQL {
 		return (new MySQL())->table($table);
 	}

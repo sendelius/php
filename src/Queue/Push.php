@@ -2,13 +2,16 @@
 
 namespace Sendelius\Queue;
 
-use Ramsey\Uuid\Uuid;
 use JsonException;
 use RuntimeException;
+use Sendelius\Config\Env;
 
 final class Push extends Resources {
 	// Добавить задачу
 	public function push(string $queue, ?array $payload = null, ?string $availableAt = null, ?string $storageId = null): int {
+		if (!Env::bool('QUEUE_ALLOW')) {
+			return 0;
+		}
 		try {
 			$payload = $payload !== null ? json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) : null;
 		} catch (JsonException $e) {
@@ -20,7 +23,6 @@ final class Push extends Resources {
 			$availableAt = date('Y-m-d H:i:s', time() + $interval);
 		}
 		return $this->table()->insert([
-			'id' => Uuid::uuid4()->toString(),
 			'queue' => $queue,
 			'payload' => $payload,
 			'storage_id' => $storageId,

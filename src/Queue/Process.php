@@ -13,6 +13,9 @@ final class Process extends Resources {
 
 	// Запустить worker
 	public function process(): int {
+		if (!Env::bool('QUEUE_ALLOW')) {
+			return 0;
+		}
 		if (!$this->lock()) {
 			return 0;
 		}
@@ -50,14 +53,7 @@ final class Process extends Resources {
 	private function next(): ?array {
 		return $this->table()->transaction(function (Database $database): ?array {
 			$table = Env::string('QUEUE_DB_TABLE', 'queue');
-			$job = $database->custom("SELECT *
-            FROM {$table}
-            WHERE status = 'pending'
-              AND available_at <= NOW()
-            ORDER BY id
-            LIMIT 1
-            FOR UPDATE", [], 'one');
-
+			$job = $database->custom("SELECT * FROM {$table} WHERE status = 'pending' AND available_at <= NOW() ORDER BY id LIMIT 1 FOR UPDATE", [], 'one');
 			if (!$job) {
 				return null;
 			}

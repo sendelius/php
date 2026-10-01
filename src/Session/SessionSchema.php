@@ -4,20 +4,53 @@ namespace Sendelius\Session;
 
 use Sendelius\Infrastructure\Schema;
 
+/**
+ * @table sessions
+ */
 class SessionSchema extends Schema {
-	public function name(): string {
-		return 'sessions';
-	}
+	/**
+	 * @column char
+	 * @length 36
+	 * @primary
+	 * @uuid
+	 */
+	public string $id;
 
-	public function schema(): array {
-		return [
-			'id' => $this->char()->length(36)->primary(),
-			'token' => $this->char()->length(64)->unique()->index(),
-			'user_id' => $this->int()->index(),
-			'expired' => $this->int()->index(),
-			'request' => $this->json(),
-			'created_at' => $this->date(),
-			'updated_at' => $this->date()->onUpdate('NOW()'),
-		];
-	}
+	/**
+	 * @column char
+	 * @length 64
+	 * @unique
+	 * @index
+	 */
+	public string $token;
+
+	/**
+	 * @column int
+	 * @index
+	 */
+	public string $userId;
+
+	/**
+	 * @column int
+	 * @index
+	 */
+	public string $expired;
+
+	/**
+	 * @column json
+	 */
+	public string $request;
+
+	/**
+	 * @column date
+	 * @default NOW()
+	 */
+	public string $createdAt;
+
+	/**
+	 * @column date
+	 * @default NOW()
+	 * @onUpdate NOW()
+	 */
+	public string $updatedAt;
 }
