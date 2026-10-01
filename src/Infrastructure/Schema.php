@@ -2,48 +2,72 @@
 
 namespace Sendelius\Infrastructure;
 
-use Sendelius\Db\Schema\ColumnBoolean;
-use Sendelius\Db\Schema\ColumnChar;
-use Sendelius\Db\Schema\ColumnDate;
-use Sendelius\Db\Schema\ColumnDecimal;
-use Sendelius\Db\Schema\ColumnEnum;
-use Sendelius\Db\Schema\ColumnInt;
-use Sendelius\Db\Schema\ColumnJson;
+use ReflectionClass;
+use ReflectionProperty;
 
 abstract class Schema {
-	abstract public function schema(): array;
-
-	public function name(): string {
-		$baseName = basename(str_replace('\\', '/', static::class));
-		$baseName = preg_replace('/Schema$/', '', $baseName);
-		return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $baseName));
+	public function table(): string {
+		$doc = (new ReflectionClass($this))->getDocComment();
+		if ($doc && preg_match('/@table\s+(\S+)/', $doc, $match)) {
+			return $match[1];
+		}
+		$name = basename(str_replace('\\', '/', static::class));
+		$name = preg_replace('/Schema$/', '', $name);
+		return strtolower(
+			preg_replace('/(?<!^)[A-Z]/', '_$0', $name)
+		);
 	}
 
-	protected function int(): ColumnInt {
-		return new ColumnInt();
+	public function schema(): array {
+		$schema = [];
+		$reflection = new ReflectionClass($this);
+		foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+			$doc = $property->getDocComment();
+			if (!$doc || !$this->annotation($doc, 'column')) {
+				continue;
+			}
+			$schema[$this->columnName($property->getName())] = $this->column($property, $doc);
+		}
+		return $schema;
 	}
 
-	protected function decimal(): ColumnDecimal {
-		return new ColumnDecimal();
+	protected function column(ReflectionProperty $property, string $doc): array {
+		$column = [
+			'type' => $this->annotation($doc, 'column'),
+		];
+		if ($length = $this->annotation($doc, 'length')) {
+			$column['length'] = $length;
+		}
+		if ($this->hasAnnotation($doc, 'primary')) {
+			$column['primary'] = true;
+		}
+		if ($this->hasAnnotation($doc, 'index')) {
+			$column['index'] = true;
+		}
+		if ($options = $this->annotation($doc, 'options')) {
+			$column['options'] = array_map('trim', explode(',', $options));
+		}
+		if (($default = $this->annotation($doc, 'default')) !== null) {
+			$column['default'] = $default;
+		}
+		if ($onUpdate = $this->annotation($doc, 'onUpdate')) {
+			$column['onUpdate'] = $onUpdate;
+		}
+		return $column;
 	}
 
-	protected function char(): ColumnChar {
-		return new ColumnChar();
+	protected function columnName(string $name): string {
+		return strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $name));
 	}
 
-	protected function boolean(): ColumnBoolean {
-		return new ColumnBoolean();
+	protected function annotation(string $doc, string $name): ?string {
+		if (!preg_match('/@' . preg_quote($name, '/') . '(?:\s+(.+?))?(?=\s*\*\/|\s*\n|\z)/', $doc, $match)) {
+			return null;
+		}
+		return isset($match[1]) ? trim($match[1]) : '';
 	}
 
-	protected function json(): ColumnJson {
-		return new ColumnJson();
-	}
-
-	protected function date(): ColumnDate {
-		return new ColumnDate();
-	}
-
-	protected function enum(): ColumnEnum {
-		return new ColumnEnum();
+	protected function hasAnnotation(string $doc, string $name): bool {
+		return preg_match('/@' . preg_quote($name, '/') . '(?:\s|$)/', $doc) === 1;
 	}
 }

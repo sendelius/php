@@ -4,10 +4,9 @@ namespace Sendelius\Db;
 
 use PDO;
 use PDOException;
+use Ramsey\Uuid\Uuid;
 use RuntimeException;
 use Throwable;
-use Ramsey\Uuid\Uuid;
-use Sendelius\Db\Schema\Registry;
 
 abstract class Database {
 	protected static PDO $pdo;

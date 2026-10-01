@@ -2,7 +2,7 @@
 
 namespace Sendelius\Infrastructure;
 
-use Sendelius\Db\Schema\Registry;
+use Sendelius\Db\Registry;
 use Sendelius\Queue\Container;
 use Sendelius\Queue\QueueSchema;
 use Sendelius\Queue\Register;

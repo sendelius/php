@@ -1,6 +1,6 @@
 <?php
 
-namespace Sendelius\Db\Schema;
+namespace Sendelius\Db;
 
 use RuntimeException;
 use Sendelius\Infrastructure\Schema;
@@ -12,11 +12,11 @@ final class Registry {
 		if (!is_a($schema, Schema::class, true)) {
 			throw new RuntimeException("класс {$schema} должен наследоваться от " . Schema::class);
 		}
-		self::$schemas[$schema] = true;
+		self::$schemas[$schema] = $schema;
 	}
 
 	public static function remove(string $schema): void {
-		unset(self::$schemas[$schema]);
+		if (isset(self::$schemas[$schema])) unset(self::$schemas[$schema]);
 	}
 
 	/**
@@ -27,9 +27,9 @@ final class Registry {
 	}
 
 	public static function get(string $table): ?Schema {
-		foreach (self::$schemas as $schema => $value) {
+		foreach (self::$schemas as $schema) {
 			$schema = new $schema();
-			if ($schema->name() === $table) {
+			if ($schema->table() === $table) {
 				return $schema;
 			}
 		}

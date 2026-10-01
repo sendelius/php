@@ -2,7 +2,7 @@
 
 namespace Sendelius\Session;
 
-use Sendelius\Db\Schema\Registry;
+use Sendelius\Db\Registry;
 
 class Session {
 	public function __construct() {
