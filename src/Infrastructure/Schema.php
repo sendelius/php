@@ -73,7 +73,7 @@ abstract class Schema {
 		if ($this->hasAnnotation($doc, 'unique')) {
 			$column['unique'] = true;
 		}
-		if ($this->annotation($doc, 'uuid')) {
+		if ($this->hasAnnotation($doc, 'uuid')) {
 			$column['uuid'] = true;
 		}
 		if ($options = $this->annotation($doc, 'options')) {

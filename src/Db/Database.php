@@ -88,7 +88,7 @@ abstract class Database {
 		return ['items' => $items, 'total' => $total, 'pagination' => $paginationData];
 	}
 
-	public function get(array $columns = []) {
+	public function get(array $columns = []): ?object {
 		$this->pieces['selectColumns'] = $columns;
 		$this->limit(1);
 		$item = $this->buildQuery('select', 'one');

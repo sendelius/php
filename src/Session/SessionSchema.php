@@ -25,7 +25,7 @@ class SessionSchema extends Schema {
 	public string $token;
 
 	/**
-	 * @column int
+	 * @column string
 	 * @index
 	 */
 	public string $userId;
@@ -34,7 +34,7 @@ class SessionSchema extends Schema {
 	 * @column int
 	 * @index
 	 */
-	public string $expired;
+	public int $expired;
 
 	/**
 	 * @column json

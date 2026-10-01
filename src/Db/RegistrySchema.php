@@ -23,7 +23,7 @@ final class RegistrySchema {
 	 * @return Schema[]
 	 */
 	public static function all(): array {
-		return array_keys(self::$schemas);
+		return self::$schemas;
 	}
 
 	public static function get(string $table): ?Schema {

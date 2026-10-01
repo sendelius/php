@@ -16,7 +16,7 @@ class SessionService extends Service {
 	) {
 	}
 
-	public function check(?string $token): ?array {
+	public function check(?string $token): ?SessionSchema {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return null;
 		}
@@ -24,22 +24,23 @@ class SessionService extends Service {
 			$token = trim((string)$_COOKIE[$this->cookieKey]);
 		}
 		if (!$token) return null;
+		/** @var SessionSchema|null $session */
 		$session = $this->mysql('sessions')->where([
 			'token' => hash('sha256', $token),
 		])->get();
 		if (!$session) return null;
-		if ($session['expired'] !== 0 and $session['expired'] < time()) {
+		if ($session->expired !== 0 and $session->expired < time()) {
 			$this->mysql('sessions')->where([
-				'id' => $session['id']
+				'id' => $session->id
 			])->delete();
 			return null;
 		}
 		// Продлеваем только если осталось меньше 23 часов
 		$sessionLifetime = Env::int('SESSION_TTL', 172800); // default = 48 часов
-		if ($session['expired'] !== 0 and ($session['expired'] - time()) < ($sessionLifetime - 3600)) {
+		if ($session->expired !== 0 and ($session->expired - time()) < ($sessionLifetime - 3600)) {
 			$expired = time() + $sessionLifetime;
 			$this->mysql('sessions')->where([
-				'id' => $session['id']
+				'id' => $session->id
 			])->update(['expired' => $expired]);
 			setcookie(
 				name: $this->cookieKey,
@@ -53,16 +54,16 @@ class SessionService extends Service {
 					'samesite' => 'Strict',
 				]
 			);
-			$session['expired'] = $expired;
+			$session->expired = $expired;
 		}
 		return $session;
 	}
 
-	public function login(string $login, string $password, ?array $session): array {
+	public function login(string $login, string $password, ?SessionSchema $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}
-		if ($session) return ['expired' => $session['expired']];
+		if ($session) return ['expired' => $session->expired];
 		$user = $this->mysql('users')->where([
 			'login' => $login,
 			'active' => 1,
@@ -155,13 +156,13 @@ class SessionService extends Service {
 		return ['success' => true, 'token' => $token];
 	}
 
-	public function logout(?array $session): array {
+	public function logout(?SessionSchema $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}
-		if (!isset($session['id'])) return ['error' => 'сессия не найдена'];
+		if (!isset($session->id)) return ['error' => 'сессия не найдена'];
 		$this->mysql('sessions')->where([
-			'id' => $session['id']
+			'id' => $session->id
 		])->delete();
 		setcookie(
 			name: $this->cookieKey,
@@ -178,13 +179,13 @@ class SessionService extends Service {
 		return ['success' => true];
 	}
 
-	public function currentUser(?array $session): array {
+	public function currentUser(?SessionSchema $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}
-		if (!isset($session['id'])) return ['error' => 'сессия не найдена'];
+		if (!isset($session->id)) return ['error' => 'сессия не найдена'];
 		$user = $this->mysql('users')->where([
-			'id' => $session['user_id'],
+			'id' => $session->userId,
 			'active' => 1,
 		])->get();
 		if (!$user) {
