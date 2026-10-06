@@ -11,7 +11,7 @@ class QueueSchema extends Schema {
 	 * @primary
 	 * @uuid
 	 */
-	public string $id;
+	public mixed $id;
 
 	/**
 	 * @column varchar
@@ -86,17 +86,4 @@ class QueueSchema extends Schema {
 	 * @default null
 	 */
 	public ?string $finishedAt;
-
-	/**
-	 * @column date
-	 * @default NOW()
-	 */
-	public string $createdAt;
-
-	/**
-	 * @column date
-	 * @default NOW()
-	 * @onUpdate NOW()
-	 */
-	public string $updatedAt;
 }

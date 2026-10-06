@@ -7,6 +7,26 @@ use ReflectionNamedType;
 use ReflectionProperty;
 
 abstract class Schema {
+	/**
+	 * @column bigint
+	 * @primary
+	 */
+	public mixed $id;
+
+	/**
+	 * @column date
+	 * @default NOW()
+	 */
+	public string $createdAt;
+
+	/**
+	 * @column date
+	 * @default NOW()
+	 * @onUpdate NOW()
+	 */
+	public string $updatedAt;
+
+
 	public function table(): string {
 		$doc = (new ReflectionClass($this))->getDocComment();
 		if ($doc && preg_match('/@table\s+(\S+)/', $doc, $match)) {

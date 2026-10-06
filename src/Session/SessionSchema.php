@@ -14,7 +14,7 @@ class SessionSchema extends Schema {
 	 * @primary
 	 * @uuid
 	 */
-	public string $id;
+	public mixed $id;
 
 	/**
 	 * @column char
@@ -40,17 +40,4 @@ class SessionSchema extends Schema {
 	 * @column json
 	 */
 	public string $request;
-
-	/**
-	 * @column date
-	 * @default NOW()
-	 */
-	public string $createdAt;
-
-	/**
-	 * @column date
-	 * @default NOW()
-	 * @onUpdate NOW()
-	 */
-	public string $updatedAt;
 }
