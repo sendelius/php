@@ -4,6 +4,7 @@ namespace Sendelius\Http;
 
 use Closure;
 use Sendelius\Config\Env;
+use Sendelius\Session\SessionService;
 
 class Router {
 	private array $routes = [];
@@ -59,7 +60,7 @@ class Router {
 				}
 				define('APP_ENV', $env);
 				$request = new Request($params);
-				$session = ($this->protectedCallback !== null) ? ($this->protectedCallback)($route, $request) : null;
+				$session = ($this->protectedCallback !== null) ? ($this->protectedCallback)($route, $request) : (new SessionService($request))->check();
 				if ($protected and (!$session or empty($session))) {
 					$this->response->status(401);
 					$this->response->error('доступ запрещен');

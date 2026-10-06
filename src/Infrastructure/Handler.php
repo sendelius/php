@@ -8,12 +8,13 @@ use Sendelius\Logger\Logger;
 use Sendelius\Progress\Progress;
 use Sendelius\Queue\Container;
 use Sendelius\Queue\Process;
+use Sendelius\Session\SessionModel;
 
 abstract class Handler {
 	protected function __construct(
-		protected Response $response,
-		protected Request  $request,
-		protected ?array   $session,
+		protected Response                $response,
+		protected Request                 $request,
+		protected SessionModel|array|null $session,
 	) {
 	}
 

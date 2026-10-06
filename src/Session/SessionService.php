@@ -16,14 +16,15 @@ class SessionService extends Service {
 	) {
 	}
 
-	public function check(?string $token): ?SessionModel {
+	public function check(): ?SessionModel {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return null;
 		}
-		if (isset($_COOKIE[$this->cookieKey])) {
-			$token = trim((string)$_COOKIE[$this->cookieKey]);
+		if (!isset($_COOKIE[$this->cookieKey])) {
+			return null;
 		}
-		if (!$token) return null;
+
+		$token = trim((string)$_COOKIE[$this->cookieKey]);
 		/** @var SessionModel|null $session */
 		$session = $this->mysql('sessions')->where([
 			'token' => hash('sha256', $token),
