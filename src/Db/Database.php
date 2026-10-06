@@ -7,7 +7,7 @@ use PDO;
 use PDOException;
 use Ramsey\Uuid\Uuid;
 use RuntimeException;
-use Sendelius\Infrastructure\Schema;
+use Sendelius\Infrastructure\Model;
 use Throwable;
 
 abstract class Database {
@@ -100,8 +100,8 @@ abstract class Database {
 			return 0;
 		}
 
-		$schema = $this->schema();
-		if ($schema) {
+		$model = $this->model();
+		if ($model) {
 			$data = $this->prepareData($data);
 			$data = $this->prepareUuid($data);
 		}
@@ -111,8 +111,8 @@ abstract class Database {
 			return 0;
 		}
 
-		if ($schema) {
-			foreach ($schema->columns() as $columnName => $column) {
+		if ($model) {
+			foreach ($model->columns() as $columnName => $column) {
 				if (isset($column['primary']) && $column['primary'] && isset($column['uuid']) && $column['uuid']) {
 					return $data[$columnName];
 				}
@@ -126,7 +126,7 @@ abstract class Database {
 		if (count($data) === 0) {
 			return false;
 		}
-		if ($this->schema()) {
+		if ($this->model()) {
 			$data = $this->prepareData($data);
 		}
 		$this->data($data, 'update');
@@ -155,9 +155,9 @@ abstract class Database {
 			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
 		}
 		$total = 0;
-		$schema = $this->schema();
+		$model = $this->model();
 		foreach (array_chunk($rows, $chunkSize) as $chunk) {
-			if ($schema) {
+			if ($model) {
 				$chunk = array_map(fn(array $row) => $this->prepareData($this->prepareUuid($row)), $chunk);
 			}
 			$columns = array_keys($chunk[0]);
@@ -191,9 +191,9 @@ abstract class Database {
 			throw new RuntimeException('ошибка базы данных: размер сегмента должен быть больше 0');
 		}
 		$total = 0;
-		$schema = $this->schema();
+		$model = $this->model();
 		foreach (array_chunk($rows, $chunkSize) as $chunk) {
-			$total += $this->transaction(function () use ($chunk, $schema) {
+			$total += $this->transaction(function () use ($chunk, $model) {
 				$count = 0;
 				foreach ($chunk as $row) {
 					if (empty($row)) {
@@ -206,7 +206,7 @@ abstract class Database {
 					if (empty($data)) {
 						continue;
 					}
-					if ($schema) {
+					if ($model) {
 						$data = $this->prepareData($data);
 					}
 					if ($this->where([$key => $value])->update($data)) {
@@ -348,12 +348,12 @@ abstract class Database {
 		}
 	}
 
-	protected function schema(): ?Schema {
-		return RegistrySchema::get($this->tableName);
+	protected function model(): ?Model {
+		return RegistryModel::get($this->tableName);
 	}
 
 	protected function prepareUuid(array $data): array {
-		foreach ($this->schema()?->columns() as $columnName => $column) {
+		foreach ($this->model()?->columns() as $columnName => $column) {
 			if (isset($column['uuid']) && $column['uuid'] && in_array($column['type'], ['char', 'varchar'], true) && !array_key_exists($columnName, $data)) {
 				$data[$columnName] = Uuid::uuid4()->toString();
 			}
@@ -362,7 +362,7 @@ abstract class Database {
 	}
 
 	protected function prepareData(array $data): array {
-		foreach ($this->schema()?->columns() ?? [] as $column => $definition) {
+		foreach ($this->model()?->columns() ?? [] as $column => $definition) {
 			if (($definition['type'] ?? null) !== 'json' || !array_key_exists($column, $data) || (!is_array($data[$column]) && !is_object($data[$column]))) {
 				continue;
 			}
@@ -376,8 +376,8 @@ abstract class Database {
 	}
 
 	protected function hydrate(array $data): object {
-		if ($schema = $this->schema()) {
-			return $schema->hydrate($data);
+		if ($model = $this->model()) {
+			return $model->hydrate($data);
 		}
 		return (object)$data;
 	}

@@ -2,9 +2,9 @@
 
 namespace Sendelius\Queue;
 
-use Sendelius\Infrastructure\Schema;
+use Sendelius\Infrastructure\Model;
 
-class QueueSchema extends Schema {
+class QueueModel extends Model {
 	/**
 	 * @column char
 	 * @length 36

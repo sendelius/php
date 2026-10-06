@@ -3,7 +3,7 @@
 namespace Sendelius\Db;
 
 use Sendelius\Config\Env;
-use Sendelius\Infrastructure\Schema;
+use Sendelius\Infrastructure\Model;
 use RuntimeException;
 
 final class Migrate {
@@ -13,16 +13,16 @@ final class Migrate {
 		if (!$mysql and !$postgresql) {
 			throw new RuntimeException('для использования миграции базы нужно чтобы было настроено подключение к базе');
 		}
-		foreach (RegistrySchema::all() as $class) {
-			$schema = new $class();
-			if ($mysql) $this->mysql($mysql, $schema);
-			if ($postgresql) $this->postgresql($postgresql, $schema);
+		foreach (RegistryModel::all() as $class) {
+			$model = new $class();
+			if ($mysql) $this->mysql($mysql, $model);
+			if ($postgresql) $this->postgresql($postgresql, $model);
 		}
 	}
 
-	private function mysql(MySQL $db, Schema $schema): void {
-		$table = $schema->table();
-		$columns = $schema->columns();
+	private function mysql(MySQL $db, Model $model): void {
+		$table = $model->table();
+		$columns = $model->columns();
 		if (!$this->mysqlTableExists($db, $table)) {
 			$definitions = [];
 			foreach ($columns as $name => $definition) {
@@ -48,9 +48,9 @@ final class Migrate {
 		$this->mysqlIndexes($db, $table, $columns);
 	}
 
-	private function postgresql(PostgreSQL $db, Schema $schema): void {
-		$table = $schema->table();
-		$columns = $schema->columns();
+	private function postgresql(PostgreSQL $db, Model $model): void {
+		$table = $model->table();
+		$columns = $model->columns();
 		if (!$this->postgresqlTableExists($db, $table)) {
 			$definitions = [];
 			foreach ($columns as $name => $definition) {

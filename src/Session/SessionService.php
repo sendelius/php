@@ -16,7 +16,7 @@ class SessionService extends Service {
 	) {
 	}
 
-	public function check(?string $token): ?SessionSchema {
+	public function check(?string $token): ?SessionModel {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return null;
 		}
@@ -24,7 +24,7 @@ class SessionService extends Service {
 			$token = trim((string)$_COOKIE[$this->cookieKey]);
 		}
 		if (!$token) return null;
-		/** @var SessionSchema|null $session */
+		/** @var SessionModel|null $session */
 		$session = $this->mysql('sessions')->where([
 			'token' => hash('sha256', $token),
 		])->get();
@@ -59,7 +59,7 @@ class SessionService extends Service {
 		return $session;
 	}
 
-	public function login(string $login, string $password, ?SessionSchema $session): array {
+	public function login(string $login, string $password, ?SessionModel $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}
@@ -156,7 +156,7 @@ class SessionService extends Service {
 		return ['success' => true, 'token' => $token];
 	}
 
-	public function logout(?SessionSchema $session): array {
+	public function logout(?SessionModel $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}
@@ -179,7 +179,7 @@ class SessionService extends Service {
 		return ['success' => true];
 	}
 
-	public function currentUser(?SessionSchema $session): array {
+	public function currentUser(?SessionModel $session): array {
 		if (!Env::bool('SESSION_ALLOW')) {
 			return [];
 		}

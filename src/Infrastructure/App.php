@@ -6,12 +6,12 @@ use Closure;
 use Dotenv\Dotenv;
 use ReflectionClass;
 use Sendelius\Config\Env;
-use Sendelius\Db\RegistrySchema;
+use Sendelius\Db\RegistryModel;
 use Sendelius\Http\Response;
 use Sendelius\Http\Router;
 use Sendelius\Logger\Logger;
-use Sendelius\Queue\QueueSchema;
-use Sendelius\Session\SessionSchema;
+use Sendelius\Queue\QueueModel;
+use Sendelius\Session\SessionModel;
 use Sendelius\System\SystemHandler;
 use Throwable;
 
@@ -56,8 +56,8 @@ abstract class App {
 			protectedCallback: $protectedCallback
 		);
 
-		if (Env::bool('QUEUE_ALLOW')) RegistrySchema::add(QueueSchema::class);
-		if (Env::bool('SESSION_ALLOW')) RegistrySchema::add(SessionSchema::class);
+		if (Env::bool('QUEUE_ALLOW')) RegistryModel::add(QueueModel::class);
+		if (Env::bool('SESSION_ALLOW')) RegistryModel::add(SessionModel::class);
 
 		if (DEV_MODE) {
 			$this->publicRoute('GET /system/schema', SystemHandler::class, 'schema');
@@ -74,8 +74,8 @@ abstract class App {
 		$this->router->route($path, $handler, $action, true);
 	}
 
-	protected function schema(string $schema): void {
-		RegistrySchema::add($schema);
+	protected function model(string $model): void {
+		RegistryModel::add($model);
 	}
 
 	protected function start(): void {

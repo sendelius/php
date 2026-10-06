@@ -2,12 +2,12 @@
 
 namespace Sendelius\Session;
 
-use Sendelius\Infrastructure\Schema;
+use Sendelius\Infrastructure\Model;
 
 /**
  * @table sessions
  */
-class SessionSchema extends Schema {
+class SessionModel extends Model {
 	/**
 	 * @column char
 	 * @length 36

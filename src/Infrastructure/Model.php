@@ -6,7 +6,7 @@ use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionProperty;
 
-abstract class Schema {
+abstract class Model {
 	/**
 	 * @column bigint
 	 * @primary
